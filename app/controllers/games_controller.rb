@@ -1,59 +1,52 @@
 require 'open-uri'
-require 'json'
 
 class GamesController < ApplicationController
-  def new
-    @letters = []
-    (0...10).map { @letters << ('a'..'z').to_a[rand(26)] }
-    @time = Time.now
+def new
+	@letters = []
+	(0...10).map { @letters << ('a'..'z').to_a[rand(26)] }
+end
+
+def score
+	@word = params[:word]
+	@grid = params[:grid]
+	@score = check_word
+end
+
+private
+
+def check_word
+	url = "https://wagon-dictionary.herokuapp.com/#{@word}"
+	result = JSON.parse(open(url).read)
+
+	grid = @grid.split(' ')
+	word = @word.split('')  
+	word_in_grid = word.all? { |letter| word.count(letter) <= grid.count(letter) }
+
+	get_result(word_in_grid, result['found'], result['length'], {})
+end
+
+def get_result(word_in_grid, match_found, word_length, result)
+  if !word_in_grid
+    result[:message] = 'The word is not in the grid'
+    result[:score] = 0
+  elsif match_found
+    result[:message] = 'Well Done!'
+    result[:score] = word_length * 2
+    add_to_total(result[:score])
+  else
+    result[:message] = 'This is not an english word'
+    result[:score] = 0
   end
 
-  def score
-    @word = params[:word]
-    @start_time = params[:start_time]
-    @grid = params[:grid]
-    @score = check_word
-  end
+  result
+end
 
-  private
-
-  def check_word
-    url = "https://wagon-dictionary.herokuapp.com/#{@word}"
-    user = JSON.parse(open(url).read)
-
-    result = { time: Time.now - @start_time.to_i, score: 0 }
-
-    letter_in_grid = compare_letters
-
-    get_result(letter_in_grid, user['found'], user['length'], result)
-  end
-
-  def compare_letters
-    letter_in_grid = ''
-
-    grid = @grid.split(' ')
-
-    @word.split('').each do |letter|
-      if grid.include?(letter)
-        grid.delete_at(grid.index(letter))
-      else
-        letter_in_grid += 'N'
-      end
-    end
-
-    letter_in_grid
-  end
-
-  def get_result(letter_in_grid, user_word, user_word_length, result)
-    if letter_in_grid.include? 'N'
-      result[:message] = 'The word is not in the grid'
-    elsif user_word
-      result[:message] = 'Well Done!'
-      result[:time] < 5 ? result[:score] = user_word_length + 1 : result[:score] = user_word_length
-    else
-      result[:message] = 'This is not an english word'
-    end
-
-    result
-  end
+	def add_to_total(score)
+		if session[:cumulative_score].nil?
+			session[:cumulative_score] = score
+		else
+    session[:cumulative_score] = session[:cumulative_score] + score
+			
+		end
+	end
 end
